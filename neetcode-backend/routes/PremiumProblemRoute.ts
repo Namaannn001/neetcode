@@ -18,7 +18,11 @@ router.get('/roadmap', authMiddleware, asyncHandler(async (req: AuthenticatedReq
     status: 'accepted'
   }).select('problemId').lean();
 
-  const solvedSet = new Set(solvedSubmissions.map(s => s.problemId.toString()));
+  const solvedSet = new Set(
+    solvedSubmissions.flatMap((submission) =>
+      submission.problemId ? [submission.problemId.toString()] : []
+    )
+  );
 
   // 3. Group by Category
   // Structure: { "Arrays": { total: 10, solved: 2, problems: [...] }, ... }

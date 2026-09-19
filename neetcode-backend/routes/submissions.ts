@@ -210,7 +210,7 @@ async function processSubmission(
       const exec = await judge0Service.execute({
         source_code: code,
         language_id: languageId,
-        stdin: testCase.input,
+        stdin: testCase.input ?? undefined,
       });
 
       const result = await judge0Service.waitForCompletion(exec.token);

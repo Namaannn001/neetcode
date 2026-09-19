@@ -1,10 +1,15 @@
 
 import dotenv from 'dotenv';
-import { database } from 'firebase-admin';
 
 dotenv.config();
+
+const numberFromEnv = (value: string | undefined, fallback: number): number => {
+  const parsed = Number.parseInt(value ?? '', 10);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
 export const config = {
-  port: parseInt(process.env.PORT , 10),
+  port: numberFromEnv(process.env.PORT, 3001),
   nodeEnv: process.env.NODE_ENV ,
 
   mongodb: {
@@ -17,9 +22,9 @@ export const config = {
     // Upstash (for example: rediss://default:<password>@<host>:6379).
     url: process.env.REDIS_URL,
     host: process.env.REDIS_HOST ,
-    port: parseInt(process.env.REDIS_PORT, 10),
+    port: numberFromEnv(process.env.REDIS_PORT, 6379),
     password: process.env.REDIS_PASSWORD ,
-    db: parseInt(process.env.REDIS_DB, 10),
+    db: numberFromEnv(process.env.REDIS_DB, 0),
   },
 
   firebase: {
@@ -31,13 +36,13 @@ export const config = {
   judge0: {
     apiUrl: process.env.JUDGE0_API_URL || 'https://ce.judge0.com',
     apiKey: process.env.JUDGE0_API_KEY || '',
-    pollingInterval: parseInt(process.env.JUDGE0_POLLING_INTERVAL , 10),
-    maxPollingAttempts: parseInt(process.env.JUDGE0_MAX_POLLING_ATTEMPTS , 10),
+    pollingInterval: numberFromEnv(process.env.JUDGE0_POLLING_INTERVAL, 1000),
+    maxPollingAttempts: numberFromEnv(process.env.JUDGE0_MAX_POLLING_ATTEMPTS, 20),
   },
 
   rateLimit: {
-    windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS ,10), // 15 minutes
-    maxRequests: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS , 10),
+    windowMs: numberFromEnv(process.env.RATE_LIMIT_WINDOW_MS, 900000), // 15 minutes
+    maxRequests: numberFromEnv(process.env.RATE_LIMIT_MAX_REQUESTS, 100),
   },
 
   cors: {

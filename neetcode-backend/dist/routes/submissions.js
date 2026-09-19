@@ -168,7 +168,7 @@ async function processSubmission(submissionId, problemId, code, language) {
                 failedTestCase = {
                     input: testCase.input,
                     expected: testCase.expectedOutput,
-                    output: result.stdout || result.stderr,
+                    output: result.stdout ?? result.stderr ?? undefined,
                 };
                 break;
             }
@@ -191,8 +191,8 @@ async function processSubmission(submissionId, problemId, code, language) {
         submission.totalTestCases = total;
         submission.completedAt = new Date();
         if (allPassed && problem.type === "dsa") {
-            submission.score = getScoreForDifficulty(problem.difficulty);
-            await leaderboardService_1.leaderboardService.updateScore(submission.userId.toString(), problemId, problem.difficulty || "easy");
+            submission.score = getScoreForDifficulty(problem.difficulty ?? undefined);
+            await leaderboardService_1.leaderboardService.updateScore(submission.userId.toString(), problemId, problem.difficulty ?? "easy");
         }
         // optional but VERY useful
         if (failedTestCase) {

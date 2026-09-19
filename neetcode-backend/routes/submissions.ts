@@ -220,7 +220,7 @@ async function processSubmission(
         failedTestCase = {
           input: testCase.input,
           expected: testCase.expectedOutput,
-          output: result.stdout || result.stderr,
+          output: result.stdout ?? result.stderr ?? undefined,
         };
         break;
       }
@@ -249,12 +249,12 @@ async function processSubmission(
     submission.completedAt = new Date();
 
     if (allPassed && problem.type === "dsa") {
-      submission.score = getScoreForDifficulty(problem.difficulty);
+      submission.score = getScoreForDifficulty(problem.difficulty ?? undefined);
 
       await leaderboardService.updateScore(
         submission.userId.toString(),
         problemId,
-        problem.difficulty || "easy"
+        problem.difficulty ?? "easy"
       );
     }
 

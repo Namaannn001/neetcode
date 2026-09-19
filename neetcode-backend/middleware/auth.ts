@@ -44,49 +44,53 @@ export async function verifyFirebaseToken(
 
 // ---------- Core Auth Middleware ----------
 export const authMiddleware = async (
-  req: AuthenticatedRequest,
+  req: Request,
   res: Response,
   next: NextFunction
-) => {
+): Promise<void> => {
+  const authenticatedRequest = req as AuthenticatedRequest;
+
   try {
     const token =
-      req.cookies?.token ||
-      req.headers.authorization?.split(" ")[1];
+      authenticatedRequest.cookies?.token ||
+      authenticatedRequest.headers.authorization?.split(" ")[1];
 
     if (!token) {
-      return res.status(401).json({ error: "Unauthorized - No token" });
+      res.status(401).json({ error: "Unauthorized - No token" });
+      return;
     }
 
     const decoded = await verifyFirebaseToken(token);
 
     // ✅ optional strict checks
     if (!decoded.email_verified) {
-      return res.status(403).json({ error: "Email not verified" });
+      res.status(403).json({ error: "Email not verified" });
+      return;
     }
 
     // ✅ Always save firebase uid
-    req.firebaseUid = decoded.uid;
-    req.email = decoded.email;
+    authenticatedRequest.firebaseUid = decoded.uid;
+    authenticatedRequest.email = decoded.email;
 
     // ✅ convert firebase uid → mongo user
     const user = await User.findOne({ firebaseUid: decoded.uid });
 
     if (!user) {
-      return res.status(401).json({ error: "User not found in MongoDB" });
+      res.status(401).json({ error: "User not found in MongoDB" });
+      return;
     }
 
     // ✅ IMPORTANT: set Mongo id into req.userId
-    req.userId = user._id.toString();
-    req.role = user.role;
-    req.user = user;
+    authenticatedRequest.userId = user._id.toString();
+    authenticatedRequest.role = user.role;
+    authenticatedRequest.user = user;
 
     // ✅ MOST IMPORTANT
     next();
   } catch (err) {
     console.log("AUTH ERROR:", err);
-    return res.status(401).json({ error: "Invalid token" });
+    res.status(401).json({ error: "Invalid token" });
   }
-  return null;
 };
 
 
@@ -94,16 +98,18 @@ export const authMiddleware = async (
 // ---------- Role Middleware (Reusable) ----------
 export function requireRole(role: "admin" | "user") {
   return (
-    req: AuthenticatedRequest,
+    req: Request,
     res: Response,
     next: NextFunction
   ): void => {
-    if (!req.role) {
+    const authenticatedRequest = req as AuthenticatedRequest;
+
+    if (!authenticatedRequest.role) {
       res.status(401).json({ error: "Not authenticated" });
       return;
     }
 
-    if (req.role !== role) {
+    if (authenticatedRequest.role !== role) {
       res.status(403).json({ error: `Requires ${role} role` });
       return;
     }
@@ -116,11 +122,12 @@ export const adminMiddleware = requireRole("admin");
 
 // ---------- Optional Auth Middleware ----------
 export function optionalAuthMiddleware(
-  req: AuthenticatedRequest,
+  req: Request,
   _res: Response,
   next: NextFunction
 ): void {
-  const authHeader = req.get("authorization");
+  const authenticatedRequest = req as AuthenticatedRequest;
+  const authHeader = authenticatedRequest.get("authorization");
 
   if (!authHeader?.startsWith("Bearer ")) return next();
 
@@ -134,9 +141,9 @@ export function optionalAuthMiddleware(
 
       const user = await User.findOne({ firebaseUid: decoded.uid });
       if (user) {
-        req.userId = user._id.toString();
-        req.email = user.email;
-        req.role = user.role;
+        authenticatedRequest.userId = user._id.toString();
+        authenticatedRequest.email = user.email;
+        authenticatedRequest.role = user.role;
       }
       next();
     })

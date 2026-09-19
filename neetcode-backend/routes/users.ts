@@ -1,5 +1,5 @@
 import { Router, Response } from "express";
-import { User, Submission, Problem } from "../models/index"; 
+import { User, Submission, Problem, CommunityMember } from "../models/index";
 import { AuthenticatedRequest } from "../types/index";
 import { authMiddleware } from "../middleware/auth";
 import { leaderboardService } from "../services/leaderboardService";
@@ -107,7 +107,6 @@ router.get(
 
       // F. Communities
       (async () => {
-        const { CommunityMember } = await import("../models/index");
         const memberships = await CommunityMember.find({
           userId: requestUserId,
         })
@@ -252,8 +251,6 @@ router.get(
     // Check URL param first. If it's "me", use auth ID. Else use param.
     const paramId = req.params.userId;
     const userId = paramId === 'me' ? req.user._id.toString() : paramId;
-
-    const { CommunityMember } = await import("../models/index");
 
     const memberships = await CommunityMember.find({ userId })
       .populate("communityId")

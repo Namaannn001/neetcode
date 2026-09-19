@@ -107,26 +107,39 @@ class LeaderboardService {
     }
     async rebuildLeaderboard() {
         index_2.logger.info('Rebuilding DSA leaderboards from MongoDB...');
-        const keys = await redis_1.redisClient.getClient().keys('leaderboard:*');
+        const client = redis_1.redisClient.getClient();
+        const keys = [
+            ...(await client.keys('leaderboard:*')),
+            ...(await client.keys(`${SCORE_KEY_PREFIX}*`)),
+        ];
         if (keys.length > 0) {
-            await redis_1.redisClient.getClient().del(keys);
+            await client.del(keys);
         }
         const scores = await index_1.Submission.aggregate([
             { $match: { status: 'accepted', problemId: { $exists: true } } },
             { $lookup: { from: 'problems', localField: 'problemId', foreignField: '_id', as: 'problem' } },
             { $unwind: '$problem' },
             { $match: { 'problem.type': 'dsa' } },
+            // A user earns points only once for each DSA problem, regardless of
+            // how many accepted submissions they made for it.
             {
                 $group: {
-                    _id: '$userId',
+                    _id: { userId: '$userId', problemId: '$problemId' },
+                    difficulty: { $first: '$problem.difficulty' },
+                    lastSolvedAt: { $max: '$createdAt' },
+                },
+            },
+            {
+                $group: {
+                    _id: '$_id.userId',
                     solvedCount: { $sum: 1 },
                     totalScore: {
                         $sum: {
                             $switch: {
                                 branches: [
-                                    { case: { $eq: ['$problem.difficulty', 'easy'] }, then: 20 },
-                                    { case: { $eq: ['$problem.difficulty', 'medium'] }, then: 30 },
-                                    { case: { $eq: ['$problem.difficulty', 'hard'] }, then: 50 },
+                                    { case: { $eq: ['$difficulty', 'easy'] }, then: 20 },
+                                    { case: { $eq: ['$difficulty', 'medium'] }, then: 30 },
+                                    { case: { $eq: ['$difficulty', 'hard'] }, then: 50 },
                                 ],
                                 default: 0
                             }
@@ -136,7 +149,7 @@ class LeaderboardService {
                 }
             }
         ]);
-        const pipeline = redis_1.redisClient.getClient().multi();
+        const pipeline = client.multi();
         for (const entry of scores) {
             const userId = entry._id.toString();
             const score = entry.totalScore;
@@ -150,6 +163,10 @@ class LeaderboardService {
         }
         await pipeline.exec();
         index_2.logger.info('Leaderboards successfully rebuilt for DSA problems.');
+        return {
+            usersRebuilt: scores.length,
+            solvedProblems: scores.reduce((total, entry) => total + entry.solvedCount, 0),
+        };
     }
     async persistToMongoDB(userId) {
         // Logic for database persistence if needed

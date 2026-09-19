@@ -139,12 +139,17 @@ export class LeaderboardService {
     });
   }
 
-  public async rebuildLeaderboard(): Promise<void> {
+  public async rebuildLeaderboard(): Promise<{ usersRebuilt: number; solvedProblems: number }> {
     logger.info('Rebuilding DSA leaderboards from MongoDB...');
     
-    const keys = await redisClient.getClient().keys('leaderboard:*');
+    const client = redisClient.getClient();
+    const keys = [
+      ...(await client.keys('leaderboard:*')),
+      ...(await client.keys(`${SCORE_KEY_PREFIX}*`)),
+    ];
+
     if (keys.length > 0) {
-        await redisClient.getClient().del(keys);
+      await client.del(keys);
     }
 
     const scores = await Submission.aggregate([
@@ -152,17 +157,26 @@ export class LeaderboardService {
       { $lookup: { from: 'problems', localField: 'problemId', foreignField: '_id', as: 'problem' } },
       { $unwind: '$problem' },
       { $match: { 'problem.type': 'dsa' } },
+      // A user earns points only once for each DSA problem, regardless of
+      // how many accepted submissions they made for it.
       {
         $group: {
-          _id: '$userId',
+          _id: { userId: '$userId', problemId: '$problemId' },
+          difficulty: { $first: '$problem.difficulty' },
+          lastSolvedAt: { $max: '$createdAt' },
+        },
+      },
+      {
+        $group: {
+          _id: '$_id.userId',
           solvedCount: { $sum: 1 },
           totalScore: {
             $sum: {
               $switch: {
                 branches: [
-                  { case: { $eq: ['$problem.difficulty', 'easy'] }, then: 20 },
-                  { case: { $eq: ['$problem.difficulty', 'medium'] }, then: 30 },
-                  { case: { $eq: ['$problem.difficulty', 'hard'] }, then: 50 },
+                  { case: { $eq: ['$difficulty', 'easy'] }, then: 20 },
+                  { case: { $eq: ['$difficulty', 'medium'] }, then: 30 },
+                  { case: { $eq: ['$difficulty', 'hard'] }, then: 50 },
                 ],
                 default: 0 
               }
@@ -173,7 +187,7 @@ export class LeaderboardService {
       }
     ]);
 
-    const pipeline = redisClient.getClient().multi();
+    const pipeline = client.multi();
 
     for (const entry of scores) {
       const userId = entry._id.toString();
@@ -191,6 +205,11 @@ export class LeaderboardService {
 
     await pipeline.exec();
     logger.info('Leaderboards successfully rebuilt for DSA problems.');
+
+    return {
+      usersRebuilt: scores.length,
+      solvedProblems: scores.reduce((total, entry) => total + entry.solvedCount, 0),
+    };
   }
 
   private async persistToMongoDB(userId: string): Promise<void> {

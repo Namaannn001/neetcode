@@ -6,6 +6,7 @@ export declare const config: {
         database: string;
     };
     redis: {
+        url: string;
         host: string;
         port: number;
         password: string;

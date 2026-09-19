@@ -5,7 +5,19 @@ const index_1 = require("../models/index");
 const auth_1 = require("../middleware/auth");
 const errorHandler_1 = require("../middleware/errorHandler");
 const index_2 = require("../logger/index");
+const leaderboardService_1 = require("../services/leaderboardService");
 const router = (0, express_1.Router)();
+router.post('/leaderboard/rebuild', auth_1.authMiddleware, auth_1.adminMiddleware, (0, errorHandler_1.asyncHandler)(async (req, res) => {
+    const result = await leaderboardService_1.leaderboardService.rebuildLeaderboard();
+    index_2.logger.info('Leaderboard rebuilt by admin', {
+        adminId: req.userId,
+        ...result,
+    });
+    return res.json({
+        message: 'Leaderboard rebuilt successfully',
+        ...result,
+    });
+}));
 router.post('/problems', auth_1.authMiddleware, auth_1.adminMiddleware, (0, errorHandler_1.asyncHandler)(async (req, res) => {
     const { title, description, type, difficulty, tags, timeLimit, memoryLimit, languages } = req.body;
     const problem = new index_1.Problem({

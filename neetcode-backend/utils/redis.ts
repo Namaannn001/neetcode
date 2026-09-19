@@ -19,14 +19,16 @@ export class RedisClient {
 
   public async connect(): Promise<void> {
     try {
-      this.client = createClient({
-        socket: {
-          host: config.redis.host,
-          port: config.redis.port,
-        },
-        password: config.redis.password || undefined,
-        database: config.redis.db,
-      });
+      this.client = config.redis.url
+        ? createClient({ url: config.redis.url })
+        : createClient({
+            socket: {
+              host: config.redis.host,
+              port: config.redis.port,
+            },
+            password: config.redis.password || undefined,
+            database: config.redis.db,
+          });
 
       this.client.on('error', (error) => {
         logger.error('Redis Client Error:', error);

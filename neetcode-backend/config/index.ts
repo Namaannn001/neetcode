@@ -13,6 +13,9 @@ export const config = {
   },
 
   redis: {
+    // A complete URL takes precedence and supports hosted providers such as
+    // Upstash (for example: rediss://default:<password>@<host>:6379).
+    url: process.env.REDIS_URL,
     host: process.env.REDIS_HOST ,
     port: parseInt(process.env.REDIS_PORT, 10),
     password: process.env.REDIS_PASSWORD ,

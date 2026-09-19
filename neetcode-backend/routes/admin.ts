@@ -10,6 +10,25 @@ import { leaderboardService } from '../services/leaderboardService';
 const router = Router();
 
 router.post(
+  '/leaderboard/rebuild',
+  authMiddleware,
+  adminMiddleware,
+  asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+    const result = await leaderboardService.rebuildLeaderboard();
+
+    logger.info('Leaderboard rebuilt by admin', {
+      adminId: req.userId,
+      ...result,
+    });
+
+    return res.json({
+      message: 'Leaderboard rebuilt successfully',
+      ...result,
+    });
+  })
+);
+
+router.post(
   '/problems',
   authMiddleware,
   adminMiddleware,

@@ -19,7 +19,10 @@ export declare class LeaderboardService {
      * Internal helper to fetch user profiles and format entries.
      */
     private populateUserData;
-    rebuildLeaderboard(): Promise<void>;
+    rebuildLeaderboard(): Promise<{
+        usersRebuilt: number;
+        solvedProblems: number;
+    }>;
     private persistToMongoDB;
 }
 export declare const leaderboardService: LeaderboardService;

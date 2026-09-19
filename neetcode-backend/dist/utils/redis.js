@@ -21,14 +21,16 @@ class RedisClient {
     }
     async connect() {
         try {
-            this.client = (0, redis_1.createClient)({
-                socket: {
-                    host: index_1.config.redis.host,
-                    port: index_1.config.redis.port,
-                },
-                password: index_1.config.redis.password || undefined,
-                database: index_1.config.redis.db,
-            });
+            this.client = index_1.config.redis.url
+                ? (0, redis_1.createClient)({ url: index_1.config.redis.url })
+                : (0, redis_1.createClient)({
+                    socket: {
+                        host: index_1.config.redis.host,
+                        port: index_1.config.redis.port,
+                    },
+                    password: index_1.config.redis.password || undefined,
+                    database: index_1.config.redis.db,
+                });
             this.client.on('error', (error) => {
                 index_2.logger.error('Redis Client Error:', error);
             });

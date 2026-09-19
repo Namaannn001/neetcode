@@ -18,7 +18,9 @@ export class Database {
 
   public async connectMongo(): Promise<void> {
     try {
-      console.log(config.mongodb.uri);
+      if (!config.mongodb.uri) {
+        throw new Error('MONGODB_URI is not configured');
+      }
       
       await mongoose.connect(config.mongodb.uri, {
         dbName: config.mongodb.database,

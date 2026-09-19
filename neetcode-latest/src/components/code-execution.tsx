@@ -1,13 +1,12 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { 
   Loader2, Play, Send, ChevronRight, Code2, RotateCcw, 
   CheckCircle2, XCircle, AlertTriangle, HelpCircle 
 } from "lucide-react";
 import Editor from "@monaco-editor/react";
-import type { editor as MonacoEditor } from "monaco-editor";
 import { auth } from "@/lib/firebase";
 import { cn } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -220,71 +219,7 @@ export function CodeExecutor({ problem, problemType, sampleTestCases, onNextProb
   const [output, setOutput] = useState("");
   const [currentSubmission, setCurrentSubmission] = useState<Submission | null>(null);
 
-  const editorContainerRef = useRef<HTMLDivElement>(null);
   const triggerTutorial = useUIStore((state) => state.triggerTutorialIfFirstTime);
-
-  // --- SHORTCUT & PASTE RESTRICTION ---
-  const handleEditorMount = useCallback((editor: MonacoEditor.IStandaloneCodeEditor, monaco: any) => {
-    // Block Ctrl+C (Copy)
-    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyC, () => {
-      toast.error("⚠️ Copy is disabled in the coding arena!");
-    });
-
-    // Block Ctrl+V (Paste)
-    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyV, () => {
-      toast.error("⚠️ Paste is disabled in the coding arena!");
-    });
-
-    // Block Ctrl+A (Select All)
-    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyA, () => {
-      toast.error("⚠️ Select All is disabled in the coding arena!");
-    });
-
-    // Block Ctrl+X (Cut)
-    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyX, () => {
-      toast.error("⚠️ Cut is disabled in the coding arena!");
-    });
-
-    // Block right-click context menu (prevents paste via menu)
-    editor.onContextMenu((e: any) => {
-      e.event.preventDefault();
-      e.event.stopPropagation();
-    });
-  }, []);
-
-  // Block paste at DOM level for the editor container
-  useEffect(() => {
-    const container = editorContainerRef.current;
-    if (!container) return;
-
-    const blockPaste = (e: ClipboardEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      toast.error("⚠️ Paste is disabled in the coding arena!");
-    };
-
-    const blockCopy = (e: ClipboardEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      toast.error("⚠️ Copy is disabled in the coding arena!");
-    };
-
-    const blockCut = (e: ClipboardEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      toast.error("⚠️ Cut is disabled in the coding arena!");
-    };
-
-    container.addEventListener("paste", blockPaste, true);
-    container.addEventListener("copy", blockCopy, true);
-    container.addEventListener("cut", blockCut, true);
-
-    return () => {
-      container.removeEventListener("paste", blockPaste, true);
-      container.removeEventListener("copy", blockCopy, true);
-      container.removeEventListener("cut", blockCut, true);
-    };
-  }, []);
 
   // --- INITIALIZATION ---
   useEffect(() => {
@@ -449,20 +384,19 @@ export function CodeExecutor({ problem, problemType, sampleTestCases, onNextProb
             </Select>
           </div>
 
-          <div className="flex-1 relative bg-[#1e1e1e]" ref={editorContainerRef}>
+          <div className="flex-1 relative bg-[#1e1e1e]">
             <Editor
               height="100%"
               language={language}
               value={code}
               onChange={(v) => setCode(v || "")}
               theme="vs-dark"
-              onMount={handleEditorMount}
               options={{
                 minimap: { enabled: false },
                 fontSize: 14,
                 fontFamily: "'JetBrains Mono', monospace",
                 padding: { top: 16 },
-                contextmenu: false,
+                contextmenu: true,
               }}
             />
             

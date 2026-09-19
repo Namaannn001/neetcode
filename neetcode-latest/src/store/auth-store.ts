@@ -1,12 +1,11 @@
 import { create } from "zustand";
 import {
   User as FirebaseUser,
-  onAuthStateChanged,
+  onIdTokenChanged,
   signOut as firebaseSignOut,
 } from "firebase/auth";
 
 import { auth } from "@/lib/firebase";
-import { api } from "@/lib/api";
 
 interface User {
   id: string;
@@ -43,7 +42,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   setInitialized: (value: boolean) => set({ initialized: value }),
   setToken: (token) => set({ token }),
   setUser: (user) => set({ user, isAuthenticated: !!user }),
-  setFirebaseUser: (firebaseUser) => set({ firebaseUser, initialized: true }),
+  setFirebaseUser: (firebaseUser) => set({ firebaseUser }),
   setLoading: (isLoading) => set({ isLoading }),
 
   logout: async () => {
@@ -56,6 +55,7 @@ export const useAuthStore = create<AuthState>((set) => ({
         firebaseUser: null,
         token: null,
         isAuthenticated: false,
+        initialized: true,
       });
     } catch (err) {
       console.error("Logout error:", err);
@@ -65,39 +65,81 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 }));
 
-// --------------------------------------------------
-// 🔐 GLOBAL AUTH LISTENER (Stable & Race-Safe)
-onAuthStateChanged(auth, async (firebaseUser) => {
-  const store = useAuthStore.getState();
-
+// Firebase persists its session in the browser. Restore the corresponding
+// backend user before marking authentication as initialized so protected pages
+// cannot redirect during the refresh-time loading window.
+onIdTokenChanged(auth, async (firebaseUser) => {
   // User logged out
   if (!firebaseUser) {
-    store.setFirebaseUser(null);
-    store.setUser(null);
-    store.setToken(null);
-    store.setLoading(false);
+    useAuthStore.setState({
+      user: null,
+      firebaseUser: null,
+      token: null,
+      isAuthenticated: false,
+      initialized: true,
+      isLoading: false,
+    });
     return;
   }
 
   // Block unverified users
   if (!firebaseUser.emailVerified) {
-    store.setFirebaseUser(null);
-    store.setUser(null);
-    store.setToken(null);
-    store.setLoading(false);
+    useAuthStore.setState({
+      user: null,
+      firebaseUser: null,
+      token: null,
+      isAuthenticated: false,
+      initialized: true,
+      isLoading: false,
+    });
     return;
   }
 
   try {
-    const token = await firebaseUser.getIdToken(true);
+    const token = await firebaseUser.getIdToken();
 
-    // ✅ ONLY store Firebase state
-    store.setToken(token);
-    store.setFirebaseUser(firebaseUser);
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ idToken: token }),
+    });
+
+    if (!response.ok) {
+      throw new Error('Unable to restore the application session');
+    }
+
+    const { user } = await response.json();
+
+    // Ignore a stale response if the user signed out or switched accounts.
+    if (auth.currentUser?.uid !== firebaseUser.uid) return;
+
+    useAuthStore.setState({
+      user,
+      firebaseUser,
+      token,
+      isAuthenticated: true,
+      initialized: true,
+      isLoading: false,
+    });
 
   } catch (err) {
     console.error("Auth state sync failed:", err);
-  } finally {
-    store.setLoading(false);
+    if (auth.currentUser?.uid !== firebaseUser.uid) return;
+
+    // Firebase has still authenticated this user. Keep the session active so a
+    // temporary backend outage does not log them out on refresh.
+    useAuthStore.setState({
+      user: {
+        id: firebaseUser.uid,
+        email: firebaseUser.email || '',
+        displayName: firebaseUser.displayName || firebaseUser.email || undefined,
+        role: 'user',
+      },
+      firebaseUser,
+      token: await firebaseUser.getIdToken(),
+      isAuthenticated: true,
+      initialized: true,
+      isLoading: false,
+    });
   }
 });
